@@ -12,13 +12,6 @@ module.exports = load = (filePath, opts, callback) ->
     rootIndex = pathArray.lastIndexOf('node_modules')
     pathArray.slice(0, (rootIndex + 2)).join('/')
 
-  getResolveFn = (resolved, parent) -> (dep) ->
-    if opts.ignore?(dep)
-      resolved[dep] = false
-    else
-      browserResolve dep, parent, (err, res) ->
-        resolved[dep] = res;
-
   tryToPack = ->
     if Object.keys(streams).length is 0
       packDeps null, Object.keys(allFiles).map (key) -> allFiles[key]
