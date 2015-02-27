@@ -12,11 +12,6 @@ module.exports = load = (filePath, opts, callback) ->
     rootIndex = pathArray.lastIndexOf('node_modules')
     pathArray.slice(0, (rootIndex + 2)).join('/')
 
-  readFile = (filePath, cb) ->
-    fs.readFile filePath, encoding: 'utf8', (err, src) ->
-      cb err if err
-      cb null, src
-
   getResolveFn = (resolved, parent) -> (dep) ->
     if opts.ignore?(dep)
       resolved[dep] = false
@@ -39,7 +34,7 @@ module.exports = load = (filePath, opts, callback) ->
     streams[pid] = false
     delete streams[parid] if parid
 
-    readFile filePath, (err, src) ->
+    fs.readFile filePath, {encoding: 'utf8'}, (err, src) ->
       callback err if err
       deps = detective(src)
 
