@@ -1,0 +1,33 @@
+{
+  "name": "deppack",
+  "description": "Simple module to pack files with dependencies.",
+  "version": "0.0.1",
+  "keywords": [
+    "dependency",
+    "pack",
+    "dep",
+    "browserify"
+  ],
+  "author": "Artem Yavorsky (http://yavorsky.org)",
+  "repository": "https://github.com/yavorsky/deppack.git",
+  "bugs": "http://github.com/yavorsky/deppack/issues",
+  "licenses": [
+    {
+      "type": "MIT"
+    }
+  ],
+  "main": "./lib/index",
+  "scripts": {
+    "prepublish": "coffee -o lib/ src/"
+  },
+  "preferGlobal": true,
+  "dependencies": {
+    "detective": "~4.0.0"
+  },
+  "devDependencies": {
+    "mocha": "~1.12.0",
+    "chai": "~1.7.0",
+    "rewire": "~1.1.3",
+    "express": "~3.3.0"
+  }
+}
