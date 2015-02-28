@@ -1,7 +1,7 @@
 {
   "name": "deppack",
   "description": "Simple module to pack files with dependencies.",
-  "version": "0.0.51",
+  "version": "0.0.52",
   "keywords": [
     "dependency",
     "pack",
@@ -16,7 +16,7 @@
       "type": "MIT"
     }
   ],
-  "main": "./lib/index",
+  "main": "./lib/deppack.js",
   "scripts": {
     "prepublish": "coffee -o lib/ src/"
   },
