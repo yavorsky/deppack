@@ -11,6 +11,7 @@ module.exports = load = (filePath, opts, callback) ->
   basedir = opts.basedir or process.cwd()
   paths = (opts.paths or process.env.NODE_PATH?.split(':') or [])
     .map (path) => sysPath.resolve(basedir, path)
+  filePath = sysPath.resolve basedir, filePath
 
   getModuleRootPath = (filePath) ->
     pathArray = filePath.split('/')
@@ -35,18 +36,19 @@ module.exports = load = (filePath, opts, callback) ->
     fs.readFile filePath, {encoding: 'utf8'}, (err, src) ->
       callback err if err
       deps = detective(src)
-
       resolved = {}
       item =
         id: filePath
         filename: filePath
         paths: paths
         package: json
+
       getResult = ->
         id: filePath
         source: src
         deps: resolved
         file: filePath
+
       if deps.length is 0
         allFiles[filePath] = getResult()
         delete streams[pid]
