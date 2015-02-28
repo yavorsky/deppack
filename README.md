@@ -4,14 +4,14 @@
 
 Example:
 
-**index.js**
+*index.js*
 ```javascript
 var lastOf = require('./lastOf')
 
-lastOf(3, 4)
+console.log(lastOf([3, 4, 2, 1]))
 ```
 
-**lastOf.js**
+*lastOf.js*
 ```javascript
 var _ = require('underscore')
 
@@ -20,7 +20,7 @@ module.exports = function (array) {
 }
 ```
 
-**write.js**
+*write.js*
 ```javascript
 
 var fs = require('fs');
