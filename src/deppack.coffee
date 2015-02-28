@@ -24,17 +24,25 @@ module.exports = load = (filePath, opts, callback) ->
 
   loadDeps = (filePath, parid) ->
     modulePath = getModuleRootPath(filePath)
-
-    jsonPath = sysPath.join modulePath, 'package.json'
-    json = require jsonPath
-    jsonDeps = Object.keys(json.dependencies || {})
-
     pid = Math.round(Math.random() * 1000000)
     streams[pid] = false
     delete streams[parid] if parid
 
+    done = ->
+      delete streams[pid]
+      tryToPack()
+
+    jsonPath = sysPath.join modulePath, 'package.json'
+
+    try
+      json = require jsonPath
+    catch error
+      return done()
+
     fs.readFile filePath, {encoding: 'utf8'}, (err, src) ->
-      callback err if err
+      if err
+        done()
+        return callback(err)
       deps = detective(src)
       resolved = {}
       item =
@@ -51,15 +59,22 @@ module.exports = load = (filePath, opts, callback) ->
 
       if deps.length is 0
         allFiles[filePath] = getResult()
-        delete streams[pid]
-        tryToPack()
+        done()
       else
         itemHandler = (dep, cb) ->
           browserResolve dep, item, (err, fullPath) ->
+            if err
+              if opts.ignoreErrors
+                return
+              else
+                cb(err)
             resolved[dep] = fullPath
             cb null, fullPath
 
         each deps, itemHandler, (err, fullPathDeps) ->
+          if err
+            done()
+            return callback(error)
           allFiles[filePath] = getResult()
           fullPathDeps.forEach (filePath) ->
             loadDeps filePath, pid
