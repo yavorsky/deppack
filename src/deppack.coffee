@@ -1,6 +1,7 @@
 detective = require 'detective'
 
 module.exports = load = (filePath, opts, callback) ->
+  callback = opts if typeof opts is 'function'
   allFiles = {}
   streams = {}
   basedir = opts.basedir or process.cwd()
@@ -70,9 +71,7 @@ module.exports = load = (filePath, opts, callback) ->
 
   packDeps = (err, deps) ->
     header = opts.header or header
-    wrapped = []
     entries = []
-    wrapped.push header
     stringDeps = deps.map (dep) ->
       if dep.entry and dep.order
         entries[dep.order] = dep.id
