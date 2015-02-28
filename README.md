@@ -4,6 +4,23 @@
 
 Example:
 
+`index.js`
+```javascript
+var lastOf = require('./lastOf')
+
+lastOf(3, 4)
+```
+
+`lastOf.js`
+```javascript
+var _ = require('underscore')
+
+module.exports = function (array) {
+  return _.last(array)
+}
+```
+
+`write.js`
 ```javascript
 
 var fs = require('fs');
