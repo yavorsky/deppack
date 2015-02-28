@@ -2,6 +2,7 @@ sysPath = require 'path'
 fs = require 'fs'
 detective = require 'detective'
 browserResolve = require 'browser-resolve'
+each = require 'async-each'
 
 module.exports = load = (filePath, opts, callback) ->
   callback = opts if typeof opts is 'function'
@@ -95,4 +96,4 @@ module.exports = load = (filePath, opts, callback) ->
 
     str = header += stringDeps.join(',')
     str += '},{},' + JSON.stringify(entries) + ');\n'
-    callback(str)
+    callback(null, str)

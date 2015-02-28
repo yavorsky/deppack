@@ -1,7 +1,7 @@
 {
   "name": "deppack",
   "description": "Simple module to pack files with dependencies.",
-  "version": "0.0.53",
+  "version": "0.0.55",
   "keywords": [
     "dependency",
     "pack",
@@ -23,7 +23,8 @@
   "preferGlobal": true,
   "dependencies": {
     "detective": "~4.0.0",
-    "browser-resolve": "~1.7.2"
+    "browser-resolve": "~1.7.2",
+    "async-each": "0.1.6"
   },
   "devDependencies": {
     "mocha": "~1.12.0",
