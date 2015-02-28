@@ -1,4 +1,6 @@
 detective = require 'detective'
+browserResolve = require 'browser-resolve'
+fs = require 'fs'
 
 module.exports = load = (filePath, opts, callback) ->
   callback = opts if typeof opts is 'function'
