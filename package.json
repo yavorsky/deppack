@@ -1,7 +1,7 @@
 {
   "name": "deppack",
   "description": "Simple module to pack files with dependencies.",
-  "version": "0.0.58",
+  "version": "0.0.7",
   "keywords": [
     "dependency",
     "pack",

@@ -4,10 +4,41 @@ detective = require 'detective'
 browserResolve = require 'browser-resolve'
 each = require 'async-each'
 
+shims = [
+  'assert',
+  'buffer',
+  'child_process',
+  'cluster',
+  'crypto',
+  'dgram',
+  'dns',
+  'events',
+  'fs',
+  'http',
+  'https',
+  'net',
+  'os',
+  'path',
+  'punycode',
+  'querystring',
+  'readline',
+  'repl',
+  'string_decoder',
+  'tls',
+  'tty',
+  'url',
+  'util',
+  'vm',
+  'zlib'
+]
+
 module.exports = load = (filePath, opts, callback) ->
   callback = opts if typeof opts is 'function'
+  opts ?= {}
   allFiles = {}
   streams = {}
+  stopped = false
+  shims = shims.concat(opts.shims) if opts.shims
   basedir = opts.basedir or process.cwd()
   paths = (opts.paths or process.env.NODE_PATH?.split(':') or [])
     .map (path) => sysPath.resolve(basedir, path)
@@ -22,7 +53,12 @@ module.exports = load = (filePath, opts, callback) ->
     if Object.keys(streams).length is 0
       packDeps null, Object.keys(allFiles).map (key) -> allFiles[key]
 
+  stop = (error, data) ->
+    stopped = true
+    callback(error, data)
+
   loadDeps = (filePath, parid) ->
+    return if stopped
     modulePath = getModuleRootPath(filePath)
     pid = Math.round(Math.random() * 1000000)
     streams[pid] = false
@@ -41,8 +77,7 @@ module.exports = load = (filePath, opts, callback) ->
 
     fs.readFile filePath, {encoding: 'utf8'}, (err, src) ->
       if err
-        done()
-        return callback(err)
+        return stop(err) if opts.rollback
       deps = detective(src)
       resolved = {}
       item =
@@ -62,22 +97,25 @@ module.exports = load = (filePath, opts, callback) ->
         done()
       else
         itemHandler = (dep, cb) ->
+          if dep in shims
+            if opts.ignoreErrors
+              cb()
+            else
+              cb(new Error("Module #{dep} is node.js shim. Use `rollback:true` in options to rollback root module or `ignoreErros: true` to load modules ignoring inaccessible modules."))
           browserResolve dep, item, (err, fullPath) ->
-            if err
-              if opts.ignoreErrors
-                return
-              else
-                cb(err)
+            return cb(err) if err
             resolved[dep] = fullPath
             cb null, fullPath
 
         each deps, itemHandler, (err, fullPathDeps) ->
           if err
-            done()
-            return callback(error)
+            if opts.rollback
+              return stop(null, '')
+            else
+              return stop(err)
           allFiles[filePath] = getResult()
           fullPathDeps.forEach (filePath) ->
-            loadDeps filePath, pid
+            loadDeps filePath, pid if filePath
 
   loadDeps(filePath)
 
