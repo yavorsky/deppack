@@ -49,6 +49,12 @@ module.exports = load = (filePath, opts, callback) ->
     rootIndex = pathArray.lastIndexOf('node_modules')
     pathArray.slice(0, (rootIndex + 2)).join('/')
 
+  getModuleRootName = (filePath) ->
+    pathArray = filePath.split('/')
+    rootIndex = pathArray.lastIndexOf('node_modules')
+    pathArray[rootIndex + 1]
+
+
   tryToPack = ->
     if Object.keys(streams).length is 0
       packDeps null, Object.keys(allFiles).map (key) -> allFiles[key]
@@ -59,7 +65,7 @@ module.exports = load = (filePath, opts, callback) ->
 
   loadDeps = (filePath, parid) ->
     return if stopped
-    modulePath = getModuleRootPath(filePath)
+    modulePath = opts.rootPath or getModuleRootPath(filePath)
     pid = Math.round(Math.random() * 1000000)
     streams[pid] = false
     delete streams[parid] if parid
@@ -117,16 +123,20 @@ module.exports = load = (filePath, opts, callback) ->
           fullPathDeps.forEach (filePath) ->
             loadDeps filePath, pid if filePath
 
+  moduleName = opts.name or getModuleRootName(filePath)
+  modulePath = filePath
   loadDeps(filePath)
+
 
   newlinesIn = (src) ->
     return 0 if !src
     newlines = src.match(/\n/g)
     if newlines then newlines.length else 0
 
-  header = '''
-    (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}) ({
-  '''
+  header = """
+    require.register('#{moduleName}', function (exp, req, mod) {
+    mod.exports = (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}) ({
+  """
 
   packDeps = (err, deps) ->
     header = opts.header or header
@@ -149,6 +159,8 @@ module.exports = load = (filePath, opts, callback) ->
       ].join('')
     entries = entries.filter (x) -> x
 
-    str = header += stringDeps.join(',')
-    str += '},{},' + JSON.stringify(entries) + ');\n'
+    str = ''
+    str += fs.readFileSync(sysPath.join(__dirname, '../helpers/require.js'), 'utf8') if !opts.ignoreRequireDefinition
+    str += header += stringDeps.join(',')
+    str += '},{},' + JSON.stringify(entries) + ")('#{modulePath}'); }) \n "
     callback(null, str)
