@@ -7,7 +7,7 @@ Example:
 *awesomeModule/index.js*
 ```javascript
 var lastOf = require('./lastOf')
-var firstOf = require './firstOf'
+var firstOf = require('./firstOf')
 
 module.exports = {
   lastOf:  lastOf,
