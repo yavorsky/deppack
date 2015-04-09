@@ -32,10 +32,25 @@ shims = [
   'zlib'
 ]
 
-module.exports = load = (filePath, opts, callback) ->
+readFile = (path, callback) ->
+  fs.readFile filePath, {encoding: 'utf8'}, callback
+
+requireDefinition = fs.readFileSync sysPath.join(__dirname, '../helpers/require.js'), 'utf8'
+
+getModuleRootPath = (path) ->
+  split = path.split('/')
+  index = split.lastIndexOf('node_modules')
+  split.slice(0, (index + 2)).join('/')
+
+getModuleRootName = (path) ->
+  split = path.split('/')
+  index = split.lastIndexOf('node_modules')
+  split[index + 1]
+
+load = (filePath, opts, callback) ->
   callback = opts if typeof opts is 'function'
-  opts ?= {}
   allFiles = {}
+  opts ?= {}
   streams = {}
   stopped = false
   shims = shims.concat(opts.shims) if opts.shims
@@ -43,17 +58,6 @@ module.exports = load = (filePath, opts, callback) ->
   paths = (opts.paths or process.env.NODE_PATH?.split(':') or [])
     .map (path) => sysPath.resolve(basedir, path)
   filePath = sysPath.resolve basedir, filePath
-
-  getModuleRootPath = (filePath) ->
-    pathArray = filePath.split('/')
-    rootIndex = pathArray.lastIndexOf('node_modules')
-    pathArray.slice(0, (rootIndex + 2)).join('/')
-
-  getModuleRootName = (filePath) ->
-    pathArray = filePath.split('/')
-    rootIndex = pathArray.lastIndexOf('node_modules')
-    pathArray[rootIndex + 1]
-
 
   tryToPack = ->
     if Object.keys(streams).length is 0
@@ -64,6 +68,7 @@ module.exports = load = (filePath, opts, callback) ->
     callback(error, data)
 
   loadDeps = (filePath, parid) ->
+    console.log 'loadDeps', filePath
     return if stopped
     modulePath = opts.rootPath or getModuleRootPath(filePath)
     pid = Math.round(Math.random() * 1000000)
@@ -81,9 +86,15 @@ module.exports = load = (filePath, opts, callback) ->
     catch error
       return done()
 
-    fs.readFile filePath, {encoding: 'utf8'}, (err, src) ->
+
+    if allFiles[filePath]
+      console.log 'Stopped', filePath
+      return done()
+
+    readFile filePath, (err, src) ->
       if err
         return stop(err) if opts.rollback
+      console.log 'Read', filePath
       deps = detective(src)
       resolved = {}
       item =
@@ -103,11 +114,6 @@ module.exports = load = (filePath, opts, callback) ->
         done()
       else
         itemHandler = (dep, cb) ->
-          if dep in shims
-            if opts.ignoreErrors
-              cb()
-            else
-              cb(new Error("Module #{dep} is node.js shim. Use `rollback:true` in options to rollback root module or `ignoreErros: true` to load modules ignoring inaccessible modules."))
           browserResolve dep, item, (err, fullPath) ->
             return cb(err) if err
             resolved[dep] = fullPath
@@ -120,13 +126,15 @@ module.exports = load = (filePath, opts, callback) ->
             else
               return stop(err)
           allFiles[filePath] = getResult()
-          fullPathDeps.forEach (filePath) ->
-            loadDeps filePath, pid if filePath
+          fullPathDeps
+          .filter (filePath) -> filePath
+          .forEach (filePath) ->
+            console.log 'each loadDeps', filePath
+            loadDeps filePath, pid
 
   moduleName = opts.name or getModuleRootName(filePath)
   modulePath = filePath
   loadDeps(filePath)
-
 
   newlinesIn = (src) ->
     return 0 if !src
@@ -139,6 +147,7 @@ module.exports = load = (filePath, opts, callback) ->
   """
 
   packDeps = (err, deps) ->
+    console.log 'packDeps', deps
     header = opts.header or header
     entries = []
     stringDeps = deps.map (dep) ->
@@ -160,7 +169,11 @@ module.exports = load = (filePath, opts, callback) ->
     entries = entries.filter (x) -> x
 
     str = ''
-    str += fs.readFileSync(sysPath.join(__dirname, '../helpers/require.js'), 'utf8') if !opts.ignoreRequireDefinition
+    str += requireDefinition if not opts.ignoreRequireDefinition
     str += header += stringDeps.join(',')
     str += '},{},' + JSON.stringify(entries) + ")('#{modulePath}'); }) \n "
     callback(null, str)
+
+  return
+
+module.exports = load
