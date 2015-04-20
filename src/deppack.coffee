@@ -32,12 +32,19 @@ shims = [
   'zlib'
 ]
 
-readFile = (path, callback) ->
-  fs.readFile filePath, {encoding: 'utf8'}, callback
-
 requireDefinition = fs.readFileSync sysPath.join(__dirname, '../helpers/require.js'), 'utf8'
 
+readFile = (path, callback) ->
+  fs.readFile path, {encoding: 'utf8'}, callback
+
+nlre = /\n/g
+newlinesIn = (src) ->
+  return 0 unless src
+  newlines = src.match(nlre)
+  if newlines then newlines.length else 0
+
 getModuleRootPath = (path) ->
+  # sysPath.sep ?
   split = path.split('/')
   index = split.lastIndexOf('node_modules')
   split.slice(0, (index + 2)).join('/')
@@ -47,133 +54,129 @@ getModuleRootName = (path) ->
   index = split.lastIndexOf('node_modules')
   split[index + 1]
 
-load = (filePath, opts, callback) ->
-  callback = opts if typeof opts is 'function'
+getHeader = (moduleName) ->
+  """
+  require.register('#{moduleName}', function (exp, req, mod) {
+  mod.exports = (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}) ({
+  """
+
+
+readFileAndProcess = (filePath, json, paths, rollback, allFiles, stop, done, loadDeps, pid) ->
+  readFile filePath, (err, src) ->
+    return stop err if err and rollback
+    # console.log 'readFile', filePath
+    deps = detective(src)
+    resolved = {}
+    item =
+      id: filePath
+      filename: filePath
+      paths: paths
+      package: json
+
+    getResult = ->
+      id: filePath
+      source: src
+      deps: resolved
+      file: filePath
+
+    if deps.length is 0
+      allFiles[filePath] = getResult()
+      return done()
+
+    itemHandler = (dep, cb) ->
+      browserResolve dep, item, (err, fullPath) ->
+        return cb(err) if err
+        resolved[dep] = fullPath
+        cb null, fullPath
+
+    each deps, itemHandler, (err, fullPathDeps) ->
+      if err
+        if rollback
+          return stop(null, '')
+        else
+          return stop(err)
+      allFiles[filePath] = getResult()
+      fullPathDeps
+      .filter (filePath) -> filePath
+      .forEach (filePath) ->
+        # console.log 'each loadDeps', filePath
+        loadDeps filePath, pid
+
+packDeps = (modulePath, header, deps, ignoreRequireDefinition) ->
+  # console.log 'packDeps', deps
+  entries = []
+  stringDeps = deps.map (dep) ->
+    if dep.entry and dep.order
+      entries[dep.order] = dep.id
+    else if dep.entry
+      entries.push row.id # ???
+    deps = Object.keys(dep.deps || {}).sort().map (key) ->
+      "#{JSON.stringify(key)}:#{JSON.stringify(dep.deps[key])}"
+    [
+      JSON.stringify(dep.id)
+      ':['
+      'function(require,module,exports){\n'
+      dep.source
+      '\n},',
+      "{ #{deps.join(',')} }"
+      ']'
+    ].join('')
+  entries = entries.filter (x) -> x
+
+  str = ''
+  str += requireDefinition unless ignoreRequireDefinition
+  str += header += stringDeps.join(',')
+  str += '},{},' + JSON.stringify(entries) + ")('#{modulePath}'); }) \n "
+  str
+
+
+loadFile = (filePath, opts, callback) ->
   allFiles = {}
-  opts ?= {}
   streams = {}
   stopped = false
-  shims = shims.concat(opts.shims) if opts.shims
-  basedir = opts.basedir or process.cwd()
-  paths = (opts.paths or process.env.NODE_PATH?.split(':') or [])
-    .map (path) => sysPath.resolve(basedir, path)
-  filePath = sysPath.resolve basedir, filePath
 
-  tryToPack = ->
-    if Object.keys(streams).length is 0
-      packDeps null, Object.keys(allFiles).map (key) -> allFiles[key]
+  if typeof opts is 'function'
+    callback = opts
+    opts = null
+
+  opts ?= {}
+  opts.paths ?= process.env.NODE_PATH?.split(':') or []
+  opts.basedir ?= process.cwd()
+
+  shims = shims.concat(opts.shims) if Array.isArray(opts.shims)
+  paths = opts.paths.map (path) -> sysPath.resolve(opts.basedir, path)
+  filePath = sysPath.resolve opts.basedir, filePath
 
   stop = (error, data) ->
     stopped = true
-    callback(error, data)
+    callback error, data
 
-  loadDeps = (filePath, parid) ->
-    console.log 'loadDeps', filePath
+  loadDeps = (filePath, parentId) ->
+    # console.log 'loadDeps', filePath
     return if stopped
-    modulePath = opts.rootPath or getModuleRootPath(filePath)
-    pid = Math.round(Math.random() * 1000000)
+    depRootPath = opts.rootPath or getModuleRootPath(filePath)
+    pid = Date.now() + Math.round(Math.random() * 1000000)
     streams[pid] = false
-    delete streams[parid] if parid
-
+    delete streams[parentId] if parentId
     done = ->
+      # console.log 'done', filePath
       delete streams[pid]
-      tryToPack()
 
-    jsonPath = sysPath.join modulePath, 'package.json'
+      # Try to pack.
+      return if Object.keys(streams).length isnt 0
+
+      deps = Object.keys(allFiles).map (key) -> allFiles[key]
+      header = opts.header or getHeader(opts.name or getModuleRootName filePath)
+      packed = packDeps filePath, header, deps, opts.ignoreRequireDefinition
+      callback null, packed
 
     try
-      json = require jsonPath
+      json = require sysPath.join depRootPath, 'package.json'
     catch error
       return done()
+    return done() if allFiles[filePath]
+    readFileAndProcess filePath, json, paths, opts.rollback, allFiles, stop, done, loadDeps, pid
 
+  loadDeps filePath
 
-    if allFiles[filePath]
-      console.log 'Stopped', filePath
-      return done()
-
-    readFile filePath, (err, src) ->
-      if err
-        return stop(err) if opts.rollback
-      console.log 'Read', filePath
-      deps = detective(src)
-      resolved = {}
-      item =
-        id: filePath
-        filename: filePath
-        paths: paths
-        package: json
-
-      getResult = ->
-        id: filePath
-        source: src
-        deps: resolved
-        file: filePath
-
-      if deps.length is 0
-        allFiles[filePath] = getResult()
-        done()
-      else
-        itemHandler = (dep, cb) ->
-          browserResolve dep, item, (err, fullPath) ->
-            return cb(err) if err
-            resolved[dep] = fullPath
-            cb null, fullPath
-
-        each deps, itemHandler, (err, fullPathDeps) ->
-          if err
-            if opts.rollback
-              return stop(null, '')
-            else
-              return stop(err)
-          allFiles[filePath] = getResult()
-          fullPathDeps
-          .filter (filePath) -> filePath
-          .forEach (filePath) ->
-            console.log 'each loadDeps', filePath
-            loadDeps filePath, pid
-
-  moduleName = opts.name or getModuleRootName(filePath)
-  modulePath = filePath
-  loadDeps(filePath)
-
-  newlinesIn = (src) ->
-    return 0 if !src
-    newlines = src.match(/\n/g)
-    if newlines then newlines.length else 0
-
-  header = """
-    require.register('#{moduleName}', function (exp, req, mod) {
-    mod.exports = (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}) ({
-  """
-
-  packDeps = (err, deps) ->
-    console.log 'packDeps', deps
-    header = opts.header or header
-    entries = []
-    stringDeps = deps.map (dep) ->
-      if dep.entry and dep.order
-        entries[dep.order] = dep.id
-      else if dep.entry
-        entries.push row.id
-      deps = Object.keys(dep.deps || {}).sort().map (key) ->
-        "#{JSON.stringify(key)}:#{JSON.stringify(dep.deps[key])}"
-      [
-        JSON.stringify(dep.id)
-        ':['
-        'function(require,module,exports){\n'
-        dep.source
-        '\n},',
-        "{ #{deps.join(',')} }"
-        ']'
-      ].join('')
-    entries = entries.filter (x) -> x
-
-    str = ''
-    str += requireDefinition if not opts.ignoreRequireDefinition
-    str += header += stringDeps.join(',')
-    str += '},{},' + JSON.stringify(entries) + ")('#{modulePath}'); }) \n "
-    callback(null, str)
-
-  return
-
-module.exports = load
+module.exports = loadFile
