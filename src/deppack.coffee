@@ -2,6 +2,7 @@ sysPath = require 'path'
 fs = require 'fs'
 detective = require 'detective'
 browserResolve = require 'browser-resolve'
+requireDefinition = require 'commonjs-require-definition'
 each = require 'async-each'
 
 shims = [
@@ -31,8 +32,6 @@ shims = [
   'vm',
   'zlib'
 ]
-
-requireDefinition = fs.readFileSync sysPath.join(__dirname, '../helpers/require.js'), 'utf8'
 
 readFile = (path, callback) ->
   fs.readFile path, {encoding: 'utf8'}, callback
