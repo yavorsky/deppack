@@ -60,24 +60,14 @@ getHeader = (moduleName) ->
   mod.exports = (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}) ({
   """
 
-
 readFileAndProcess = (filePath, json, paths, rollback, allFiles, stop, done, loadDeps, pid) ->
   readFile filePath, (err, src) ->
     return stop err if err and rollback
     # console.log 'readFile', filePath
     deps = detective(src)
     resolved = {}
-    item =
-      id: filePath
-      filename: filePath
-      paths: paths
-      package: json
-
-    getResult = ->
-      id: filePath
-      source: src
-      deps: resolved
-      file: filePath
+    item = {id: filePath, filename: filePath, paths, package: json}
+    getResult = -> {id: filePath, source: src, deps: resolved, file: filePath}
 
     if deps.length is 0
       allFiles[filePath] = getResult()
@@ -101,6 +91,7 @@ readFileAndProcess = (filePath, json, paths, rollback, allFiles, stop, done, loa
       .forEach (filePath) ->
         # console.log 'each loadDeps', filePath
         loadDeps filePath, pid
+    return
 
 packDeps = (modulePath, header, deps, ignoreRequireDefinition) ->
   # console.log 'packDeps', deps
