@@ -1,7 +1,7 @@
 {
   "name": "deppack",
   "description": "Simple module to pack files with dependencies.",
-  "version": "0.0.81",
+  "version": "0.1.0",
   "keywords": [
     "dependency",
     "pack",
@@ -18,13 +18,14 @@
   ],
   "main": "./lib/deppack.js",
   "scripts": {
-    "prepublish": "coffee -o lib/ src/"
+    "prepublish": "coffee -bo lib/ src/"
   },
   "preferGlobal": true,
   "dependencies": {
-    "detective": "~4.0.0",
+    "async-each": "~0.1.6",
     "browser-resolve": "~1.7.2",
-    "async-each": "0.1.6"
+    "commonjs-require-definition": "^0.2.0",
+    "detective": "~4.0.0"
   },
   "devDependencies": {
     "mocha": "~1.12.0",
