@@ -136,6 +136,7 @@ loadFile = (filePath, opts, callback) ->
   shims = shims.concat(opts.shims) if Array.isArray(opts.shims)
   paths = opts.paths.map (path) -> sysPath.resolve(opts.basedir, path)
   filePath = sysPath.resolve opts.basedir, filePath
+  entryModuleFilePath = filePath
 
   stop = (error, data) ->
     stopped = true
@@ -156,7 +157,7 @@ loadFile = (filePath, opts, callback) ->
       return if Object.keys(streams).length isnt 0
 
       deps = Object.keys(allFiles).map (key) -> allFiles[key]
-      header = opts.header or getHeader(opts.name or getModuleRootName filePath)
+      header = opts.header or getHeader(opts.name or getModuleRootName entryModuleFilePath)
       packed = packDeps filePath, header, deps, opts.ignoreRequireDefinition
       callback null, packed
 
