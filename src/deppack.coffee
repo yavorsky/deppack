@@ -5,6 +5,8 @@ browserResolve = require 'browser-resolve'
 requireDefinition = require 'commonjs-require-definition'
 each = require 'async-each'
 
+separator = sysPath.sep or (if isWindows then '\\' else '/')
+
 shims = [
   'assert',
   'buffer',
@@ -43,13 +45,12 @@ newlinesIn = (src) ->
   if newlines then newlines.length else 0
 
 getModuleRootPath = (path) ->
-  # sysPath.sep ?
-  split = path.split('/')
+  split = path.split(separator)
   index = split.lastIndexOf('node_modules')
-  split.slice(0, (index + 2)).join('/')
+  split.slice(0, (index + 2)).join(separator)
 
 getModuleRootName = (path) ->
-  split = path.split('/')
+  split = path.split(separator)
   index = split.lastIndexOf('node_modules')
   split[index + 1]
 
