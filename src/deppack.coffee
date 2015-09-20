@@ -159,7 +159,7 @@ loadFile = (filePath, opts, callback) ->
 
       deps = Object.keys(allFiles).map (key) -> allFiles[key]
       header = opts.header or getHeader(opts.name or getModuleRootName entryModuleFilePath)
-      packed = packDeps filePath, header, deps, opts.ignoreRequireDefinition
+      packed = packDeps entryModuleFilePath, header, deps, opts.ignoreRequireDefinition
       callback null, packed
 
     try
