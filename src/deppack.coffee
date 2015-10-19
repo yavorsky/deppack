@@ -4,7 +4,9 @@ detective = require 'detective'
 browserResolve = require 'browser-resolve'
 requireDefinition = require 'commonjs-require-definition'
 each = require 'async-each'
+os = require 'os'
 
+isWindows = (os.platform() is 'win32')
 separator = sysPath.sep or (if isWindows then '\\' else '/')
 
 shims = [
@@ -159,6 +161,8 @@ loadFile = (filePath, opts, callback) ->
 
       deps = Object.keys(allFiles).map (key) -> allFiles[key]
       header = opts.header or getHeader(opts.name or getModuleRootName entryModuleFilePath)
+      if isWindows
+        entryModuleFilePath = entryModuleFilePath.replace(/\\/g, '\\\\')
       packed = packDeps entryModuleFilePath, header, deps, opts.ignoreRequireDefinition
       callback null, packed
 
